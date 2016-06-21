@@ -21,18 +21,18 @@ TEST(NodeTest, CopyConstructor) {
 
   node = Node("Bye, World!");
 
-  EXPECT_TRUE(node.IsScalar());
   EXPECT_EQ("Hello, World!", copy.as<std::string>());
   EXPECT_EQ("Bye, World!", node.as<std::string>());
 }
 
 TEST(NodeTest, CopyAssignment) {
   Node node = Node("Hello, World!");
-  Node copy = node;
+  Node copy = Node("Nice to meet you!");
+
+  copy = node;
 
   node = Node("Bye, World!");
 
-  EXPECT_TRUE(node.IsScalar());
   EXPECT_EQ("Hello, World!", copy.as<std::string>());
   EXPECT_EQ("Bye, World!", node.as<std::string>());
 }
