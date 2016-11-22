@@ -116,7 +116,7 @@ class YAML_CPP_API Node {
  private:
   enum Zombie { ZombieNode };
   explicit Node(Zombie);
-  explicit Node(detail::node& node, detail::shared_memory_holder pMemory);
+  explicit Node(detail::node& node, detail::shared_memory_holder& pMemory);
 
   void EnsureNodeExists() const;
 

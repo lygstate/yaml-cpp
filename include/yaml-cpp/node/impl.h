@@ -51,7 +51,7 @@ inline Node::Node(Zombie)
       m_pMemory(nullptr),
       m_pNode(NULL) {}
 
-inline Node::Node(detail::node& node, detail::shared_memory_holder pMemory)
+inline Node::Node(detail::node& node, detail::shared_memory_holder& pMemory)
     : m_isValid(true),
       m_pMemory(pMemory),
       m_pNode(&node) {}
