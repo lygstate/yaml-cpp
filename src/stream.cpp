@@ -4,6 +4,7 @@
 
 #ifndef YAML_PREFETCH_SIZE
 #define YAML_PREFETCH_SIZE 8192
+//#define YAML_PREFETCH_SIZE 1024
 #endif
 
 #define S_ARRAY_SIZE(A) (sizeof(A) / sizeof(*(A)))
@@ -166,9 +167,13 @@ inline char Utf8Adjust(unsigned long ch, unsigned char lead_bits,
       static_cast<unsigned char>(header | ((ch >> rshift) & mask)));
 }
 
-inline void QueueUnicodeCodepoint(std::deque<char>& q, unsigned long ch) {
+inline void Stream::QueueUnicodeCodepoint(unsigned long ch) const {
   // We are not allowed to queue the Stream::eof() codepoint, so
   // replace it with CP_REPLACEMENT_CHARACTER
+
+  //std::deque<char>& q,
+  auto& q = m_readahead;
+
   if (static_cast<unsigned long>(Stream::eof()) == ch) {
     ch = CP_REPLACEMENT_CHARACTER;
   }
@@ -188,6 +193,20 @@ inline void QueueUnicodeCodepoint(std::deque<char>& q, unsigned long ch) {
     q.push_back(Utf8Adjust(ch, 1, 6));
     q.push_back(Utf8Adjust(ch, 1, 0));
   }
+}
+
+Stream::Stream(const std::string& input)
+    : m_input(reinterpret_cast<std::istream&>(*this)),
+      m_pPrefetched(new unsigned char[YAML_PREFETCH_SIZE]),
+      m_nPrefetchedAvailable(input.length()),
+      m_nPrefetchedUsed(0) {
+
+    m_buffer = input.data();
+    m_readaheadSize = input.size();
+    m_nostream = true;
+
+    m_charSet = utf8;
+    ReadAheadTo(0);
 }
 
 Stream::Stream(std::istream& input)
@@ -292,7 +311,7 @@ void Stream::eat(int n) {
   for (int i = 0; i < n; i++) {
     // inline get();
     //char ch = peek();
-    char ch = m_readahead[0];
+    char ch = m_buffer[m_readaheadPos];
     AdvanceCurrent();
     m_mark.column++;
 
@@ -304,10 +323,13 @@ void Stream::eat(int n) {
 }
 
 void Stream::eat() {
-    char ch = m_readahead[0];
+    char ch = m_buffer[m_readaheadPos];
 
     //AdvanceCurrent();
-    m_readahead.pop_front();
+    //m_readahead.pop_front();
+    //m_readaheadPos = (m_readaheadPos + 1) % m_readaheadSize;
+    m_readaheadPos++;
+
     m_mark.pos++;
     ReadAheadTo(0);
 
@@ -319,8 +341,10 @@ void Stream::eat() {
 }
 
 void Stream::AdvanceCurrent() {
-  if (!m_readahead.empty()) {
-    m_readahead.pop_front();
+   if (m_readaheadSize - m_readaheadPos > 0) {
+      //m_readahead.pop_front();
+      //m_readaheadPos = (m_readaheadPos + 1) % m_readaheadSize;
+    m_readaheadPos++;
     m_mark.pos++;
   }
 
@@ -329,20 +353,34 @@ void Stream::AdvanceCurrent() {
 
 void Stream::SkipWhiteSpace() {
     size_t count = 0;
-    for (char c : m_readahead) {
-        if (c != ' ') { break; }
+    for (size_t i = m_readaheadPos; i < m_readaheadSize; i++) {
+        if (m_buffer[i] != ' ') { break; }
         count++;
     }
     if (count > 0) {
-        m_readahead.erase(m_readahead.begin(), m_readahead.begin() + count);
+        //m_readahead.erase(m_readahead.begin(), m_readahead.begin() + count);
+        m_readaheadPos += count;
         m_mark.pos += count;
         m_mark.column += count;
         ReadAheadTo(0);
     }
+
+    // size_t count = 0;
+    // for (char c : m_readahead) {
+    //     if (c != ' ') { break; }
+    //     count++;
+    // }
+    // if (count > 0) {
+    //     m_readahead.erase(m_readahead.begin(), m_readahead.begin() + count);
+    //     m_mark.pos += count;
+    //     m_mark.column += count;
+    //     ReadAheadTo(0);
+    // }
 }
 
 bool Stream::_ReadAheadTo(size_t i) const {
 #if 1
+    if (m_nostream) { return false; }
 
     if (m_charSet == utf8) {
         if (m_nPrefetchedUsed < m_nPrefetchedAvailable) {
@@ -350,13 +388,16 @@ bool Stream::_ReadAheadTo(size_t i) const {
                                m_pPrefetched + m_nPrefetchedUsed,
                                m_pPrefetched + m_nPrefetchedAvailable);
             m_nPrefetchedUsed = m_nPrefetchedAvailable;
+            //m_nPrefetchedAvailable = 0;
         }
+        //printf("read %d %d %d %d/%d\n", m_readaheadPos, m_readahead.size(), i, m_nPrefetchedUsed, m_nPrefetchedAvailable);
 
-        if (m_readahead.size() <= i) {
-            while (m_readahead.size() <= i) {
+        if (m_readaheadSize - m_readaheadPos <= i) {
+            while (m_readaheadSize - m_readaheadPos <= i) {
                 unsigned char b = GetNextByte();
                 if (m_input.good()) {
                     m_readahead.push_back(b);
+                    m_readaheadSize++;
                 } else {
                     break;
                 }
@@ -378,9 +419,10 @@ bool Stream::_ReadAheadTo(size_t i) const {
         if (!m_input.good())
             m_readahead.push_back(Stream::eof());
     }
+    m_readaheadSize = m_readahead.size();
+    m_buffer = m_readahead.data();
 
-
-    return m_readahead.size() > i;
+    return m_readaheadSize > i;
 #else
     while (m_input.good() && (m_readahead.size() <= i)) {
     switch (m_charSet) {
@@ -432,7 +474,7 @@ void Stream::StreamInUtf16() const {
 
   if (ch >= 0xDC00 && ch < 0xE000) {
     // Trailing (low) surrogate...ugh, wrong order
-    QueueUnicodeCodepoint(m_readahead, CP_REPLACEMENT_CHARACTER);
+    QueueUnicodeCodepoint(CP_REPLACEMENT_CHARACTER);
     return;
   } else if (ch >= 0xD800 && ch < 0xDC00) {
     // ch is a leading (high) surrogate
@@ -444,7 +486,7 @@ void Stream::StreamInUtf16() const {
       bytes[0] = GetNextByte();
       bytes[1] = GetNextByte();
       if (!m_input.good()) {
-        QueueUnicodeCodepoint(m_readahead, CP_REPLACEMENT_CHARACTER);
+        QueueUnicodeCodepoint(CP_REPLACEMENT_CHARACTER);
         return;
       }
       unsigned long chLow = (static_cast<unsigned long>(bytes[nBigEnd]) << 8) |
@@ -452,12 +494,12 @@ void Stream::StreamInUtf16() const {
       if (chLow < 0xDC00 || chLow >= 0xE000) {
         // Trouble...not a low surrogate.  Dump a REPLACEMENT CHARACTER into the
         // stream.
-        QueueUnicodeCodepoint(m_readahead, CP_REPLACEMENT_CHARACTER);
+        QueueUnicodeCodepoint(CP_REPLACEMENT_CHARACTER);
 
         // Deal with the next UTF-16 unit
         if (chLow < 0xD800 || chLow >= 0xE000) {
           // Easiest case: queue the codepoint and return
-          QueueUnicodeCodepoint(m_readahead, ch);
+          QueueUnicodeCodepoint(ch);
           return;
         } else {
           // Start the loop over with the new high surrogate
@@ -479,7 +521,7 @@ void Stream::StreamInUtf16() const {
     }
   }
 
-  QueueUnicodeCodepoint(m_readahead, ch);
+  QueueUnicodeCodepoint(ch);
 }
 
 inline char* ReadBuffer(unsigned char* pBuffer) {
@@ -525,6 +567,6 @@ void Stream::StreamInUtf32() const {
     ch |= bytes[pIndexes[i]];
   }
 
-  QueueUnicodeCodepoint(m_readahead, ch);
+  QueueUnicodeCodepoint(ch);
 }
 }
