@@ -40,29 +40,29 @@ void NodeBuilder::OnAlias(const Mark& /* mark */, anchor_t anchor) {
   Pop();
 }
 
-void NodeBuilder::OnScalar(const Mark& mark, const std::string& tag,
-                           anchor_t anchor, const std::string& value) {
+void NodeBuilder::OnScalar(const Mark& mark, std::string tag,
+                           anchor_t anchor, std::string value) {
   detail::node& node = Push(mark, anchor);
-  node.set_scalar(value);
-  node.set_tag(tag);
+  node.set_scalar(std::move(value));
+  node.set_tag(std::move(tag));
   Pop();
 }
 
-void NodeBuilder::OnSequenceStart(const Mark& mark, const std::string& tag,
+void NodeBuilder::OnSequenceStart(const Mark& mark, std::string tag,
                                   anchor_t anchor, EmitterStyle::value style) {
   detail::node& node = Push(mark, anchor);
-  node.set_tag(tag);
+  node.set_tag(std::move(tag));
   node.set_type(NodeType::Sequence);
   node.set_style(style);
 }
 
 void NodeBuilder::OnSequenceEnd() { Pop(); }
 
-void NodeBuilder::OnMapStart(const Mark& mark, const std::string& tag,
+void NodeBuilder::OnMapStart(const Mark& mark, std::string tag,
                              anchor_t anchor, EmitterStyle::value style) {
   detail::node& node = Push(mark, anchor);
   node.set_type(NodeType::Map);
-  node.set_tag(tag);
+  node.set_tag(std::move(tag));
   node.set_style(style);
   m_mapDepth++;
 }

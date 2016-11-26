@@ -53,11 +53,12 @@ void SingleDocParser::HandleNode(EventHandler& eventHandler) {
     return;
   }
 
+  const Token& first = m_scanner.peek();
   // save location
-  Mark mark = m_scanner.peek().mark;
+  Mark mark = first.mark;
 
   // special case: a value node by itself must be a map, with no header
-  if (m_scanner.peek().type == Token::VALUE) {
+  if (first.type == Token::VALUE) {
     eventHandler.OnMapStart(mark, "?", NullAnchor, EmitterStyle::Default);
     HandleMap(eventHandler);
     eventHandler.OnMapEnd();
@@ -65,8 +66,8 @@ void SingleDocParser::HandleNode(EventHandler& eventHandler) {
   }
 
   // special case: an alias node
-  if (m_scanner.peek().type == Token::ALIAS) {
-    eventHandler.OnAlias(mark, LookupAnchor(mark, m_scanner.peek().value));
+  if (first.type == Token::ALIAS) {
+    eventHandler.OnAlias(mark, LookupAnchor(mark, first.value));
     m_scanner.pop_unsafe();
     return;
   }
@@ -75,7 +76,7 @@ void SingleDocParser::HandleNode(EventHandler& eventHandler) {
   anchor_t anchor;
   ParseProperties(tag, anchor);
 
-  const Token& token = m_scanner.peek();
+  Token& token = m_scanner.peek();
 
   if (token.type == Token::PLAIN_SCALAR && IsNullString(token.value)) {
     eventHandler.OnNull(mark, anchor);
@@ -91,26 +92,26 @@ void SingleDocParser::HandleNode(EventHandler& eventHandler) {
   switch (token.type) {
     case Token::PLAIN_SCALAR:
     case Token::NON_PLAIN_SCALAR:
-      eventHandler.OnScalar(mark, tag, anchor, token.value);
+      eventHandler.OnScalar(mark, std::move(tag), anchor, std::move(token.value));
       m_scanner.pop_unsafe();
       return;
     case Token::FLOW_SEQ_START:
-      eventHandler.OnSequenceStart(mark, tag, anchor, EmitterStyle::Flow);
+      eventHandler.OnSequenceStart(mark, std::move(tag), anchor, EmitterStyle::Flow);
       HandleSequence(eventHandler);
       eventHandler.OnSequenceEnd();
       return;
     case Token::BLOCK_SEQ_START:
-      eventHandler.OnSequenceStart(mark, tag, anchor, EmitterStyle::Block);
+      eventHandler.OnSequenceStart(mark, std::move(tag), anchor, EmitterStyle::Block);
       HandleSequence(eventHandler);
       eventHandler.OnSequenceEnd();
       return;
     case Token::FLOW_MAP_START:
-      eventHandler.OnMapStart(mark, tag, anchor, EmitterStyle::Flow);
+      eventHandler.OnMapStart(mark, std::move(tag), anchor, EmitterStyle::Flow);
       HandleMap(eventHandler);
       eventHandler.OnMapEnd();
       return;
     case Token::BLOCK_MAP_START:
-      eventHandler.OnMapStart(mark, tag, anchor, EmitterStyle::Block);
+      eventHandler.OnMapStart(mark, std::move(tag), anchor, EmitterStyle::Block);
       HandleMap(eventHandler);
       eventHandler.OnMapEnd();
       return;
@@ -118,7 +119,7 @@ void SingleDocParser::HandleNode(EventHandler& eventHandler) {
       // compact maps can only go in a flow sequence
       if (m_pCollectionStack->GetCurCollectionType() ==
           CollectionType::FlowSeq) {
-        eventHandler.OnMapStart(mark, tag, anchor, EmitterStyle::Flow);
+        eventHandler.OnMapStart(mark, std::move(tag), anchor, EmitterStyle::Flow);
         HandleMap(eventHandler);
         eventHandler.OnMapEnd();
         return;
@@ -131,7 +132,7 @@ void SingleDocParser::HandleNode(EventHandler& eventHandler) {
   if (tag == "?")
     eventHandler.OnNull(mark, anchor);
   else
-    eventHandler.OnScalar(mark, tag, anchor, "");
+    eventHandler.OnScalar(mark, std::move(tag), anchor, "");
 }
 
 void SingleDocParser::HandleSequence(EventHandler& eventHandler) {

@@ -26,14 +26,14 @@ class GraphBuilderAdapter : public EventHandler {
 
   virtual void OnNull(const Mark& mark, anchor_t anchor);
   virtual void OnAlias(const Mark& mark, anchor_t anchor);
-  virtual void OnScalar(const Mark& mark, const std::string& tag,
-                        anchor_t anchor, const std::string& value);
+  virtual void OnScalar(const Mark& mark, std::string tag,
+                        anchor_t anchor, std::string value);
 
-  virtual void OnSequenceStart(const Mark& mark, const std::string& tag,
+  virtual void OnSequenceStart(const Mark& mark, std::string tag,
                                anchor_t anchor, EmitterStyle::value style);
   virtual void OnSequenceEnd();
 
-  virtual void OnMapStart(const Mark& mark, const std::string& tag,
+  virtual void OnMapStart(const Mark& mark, std::string tag,
                           anchor_t anchor, EmitterStyle::value style);
   virtual void OnMapEnd();
 

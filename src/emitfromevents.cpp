@@ -36,14 +36,14 @@ void EmitFromEvents::OnAlias(const Mark&, anchor_t anchor) {
   m_emitter << Alias(ToString(anchor));
 }
 
-void EmitFromEvents::OnScalar(const Mark&, const std::string& tag,
-                              anchor_t anchor, const std::string& value) {
+void EmitFromEvents::OnScalar(const Mark&, std::string tag,
+                              anchor_t anchor, std::string value) {
   BeginNode();
   EmitProps(tag, anchor);
   m_emitter << value;
 }
 
-void EmitFromEvents::OnSequenceStart(const Mark&, const std::string& tag,
+void EmitFromEvents::OnSequenceStart(const Mark&, const std::string tag,
                                      anchor_t anchor,
                                      EmitterStyle::value style) {
   BeginNode();
@@ -68,7 +68,7 @@ void EmitFromEvents::OnSequenceEnd() {
   m_stateStack.pop();
 }
 
-void EmitFromEvents::OnMapStart(const Mark&, const std::string& tag,
+void EmitFromEvents::OnMapStart(const Mark&, std::string tag,
                                 anchor_t anchor, EmitterStyle::value style) {
   BeginNode();
   EmitProps(tag, anchor);
