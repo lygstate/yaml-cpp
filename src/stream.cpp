@@ -310,10 +310,6 @@ void Stream::eat(int n) {
   }
 }
 
-// void Stream::eat() {
-//     AdvanceCurrent();
-// }
-
 void Stream::AdvanceCurrent() {
 
     m_readaheadPos++;
@@ -327,23 +323,29 @@ void Stream::AdvanceCurrent() {
        m_mark.line++;
    }
 
-   if (ReadAheadTo(0)) {
+   if (likely(ReadAheadTo(0))) {
        m_char = m_buffer[m_readaheadPos];
    } else {
        m_char = Stream::eof();
    }
 }
 
-// NB only skips readahead whitespace
 void Stream::EatSpace() {
 
   while (m_char == ' ') {
+    size_t pos = 0;
+    size_t available = m_readaheadSize - m_readaheadPos;
 
-    m_readaheadPos++;
-    m_mark.pos++;
-    m_mark.column++;
+    while (m_char == ' ') {
+      if (pos++ < available) {
+        m_char = m_buffer[m_readaheadPos + pos];
+      }
+    }
+    m_readaheadPos += pos;
+    m_mark.pos += pos;
+    m_mark.column += pos;
 
-    if (ReadAheadTo(0)) {
+    if (likely(ReadAheadTo(0))) {
       m_char = m_buffer[m_readaheadPos];
     } else {
       m_char = Stream::eof();
@@ -351,9 +353,35 @@ void Stream::EatSpace() {
   }
 }
 
+bool Stream::EatLineBreak() {
+
+  if (m_char == '\n') {
+    m_readaheadPos++;
+    m_mark.pos++;
+    m_mark.column = 0;
+    m_mark.line++;
+  } else if (m_char == '\r' &&
+             (ReadAheadTo(1) && m_buffer[m_readaheadPos + 1])) {
+    m_readaheadPos += 2;
+    m_mark.pos += 2;
+    m_mark.column = 0;
+    m_mark.line++;
+  } else {
+    return false;
+  }
+
+  if (ReadAheadTo(0)) {
+    m_char = m_buffer[m_readaheadPos];
+  } else {
+    m_char = Stream::eof();
+  }
+  return true;
+}
+
 void Stream::EatToEndOfLine() {
 
-  while (m_char != Stream::eof() && !Exp::Break::Matches(*this)) {
+  //while (m_char != Stream::eof() && !Exp::Break::Matches(*this)) {
+  while (m_char != '\n' && m_char != Stream::eof()) {
 
     m_readaheadPos++;
     m_mark.pos++;
