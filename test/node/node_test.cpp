@@ -354,8 +354,13 @@ TEST(NodeTest, KeyNodeExitsScope) {
     Node temp("Hello, world");
     node[temp] = 0;
   }
+
+  EXPECT_TRUE(node.IsMap());
+  EXPECT_EQ(node.size(), 1);
+
   for (Node::const_iterator it = node.begin(); it != node.end(); ++it) {
-    (void)it;
+    EXPECT_EQ(it->first.Scalar(), "Hello, world");
+    EXPECT_EQ(it->second.Scalar(), "0");
   }
 }
 
@@ -495,5 +500,22 @@ TEST_F(NodeEmitterTest, NestFlowMapListNode) {
 
   ExpectOutput("{position: [1.01, 2.01, 3.01]}", mapNode);
 }
+
+TEST(NodeTest, ChildNodesAliveAfterOwnerNodeExitsScope) {
+
+  Node node;
+  {
+    Node tmp;
+    Node n = tmp["Message"];
+    n["Hello"] = "World";
+    node = tmp;
+  }
+
+  EXPECT_TRUE(node.IsMap());
+  EXPECT_TRUE(node["Message"].IsMap());
+  EXPECT_TRUE(node["Message"]["Hello"].IsScalar());
+  EXPECT_EQ(node["Message"]["Hello"].Scalar(), "World");
+}
+
 }
 }
