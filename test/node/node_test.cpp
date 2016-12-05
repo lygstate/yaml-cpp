@@ -517,5 +517,26 @@ TEST(NodeTest, ChildNodesAliveAfterOwnerNodeExitsScope) {
   EXPECT_EQ(node["Message"]["Hello"].Scalar(), "World");
 }
 
+TEST(NodeTest, OverwriteMapWithSequence) {
+
+  Node ac;
+  ac["c"] = "c";
+
+  Node a;
+  a["a"] = ac;
+
+  EXPECT_TRUE(a["a"].IsMap());
+  EXPECT_TRUE(a["a"].size() == 1);
+
+  Node b;
+  b.push_back("b1");
+  b.push_back("b2");
+
+  a["a"] = b;
+
+  EXPECT_TRUE(a["a"].IsSequence());
+  EXPECT_TRUE(a["a"].size() == 2);
+}
+
 }
 }

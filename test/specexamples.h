@@ -843,4 +843,8 @@ const char *ex8_22 =
     " - nested\n"
     "mapping: !!map\n"
     " foo: bar\n";
+
+const char *ex8_23 = R"END(
+            a: [ b, c]
+    )END";
 }

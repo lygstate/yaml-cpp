@@ -1127,5 +1127,14 @@ TEST(NodeSpecTest, Ex8_22_BlockCollectionNodes) {
   EXPECT_EQ(1, doc["mapping"].size());
   EXPECT_EQ("bar", doc["mapping"]["foo"].as<std::string>());
 }
+
+TEST(NodeSpecTest, Ex8_23_Regression) {
+  Node doc = YAML::Load(std::string(ex8_23));
+  EXPECT_EQ(1, doc.size());
+  EXPECT_EQ(2, doc["a"].size());
+  EXPECT_EQ("b", doc["a"][0].as<std::string>());
+  EXPECT_EQ("c", doc["a"][1].as<std::string>());
+}
+
 }
 }
