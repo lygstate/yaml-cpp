@@ -62,13 +62,19 @@ struct Char {
   static const std::size_t max_match = 1;
 };
 
+template<std::size_t>
+struct size {};
+
+
+static const size_t A_NOT_EQUAL_B_NOT_EQUAL = 0;
+static const size_t A_NOT_EQUAL_B_EQUAL = 1;
+static const size_t A_EQUAL_B_NOT_EQUAL = 2;
+static const size_t A_EQUAL_B_EQUAL = 3;
+
 template <typename A, typename... B>
 struct OR {
-  template <std::size_t N, typename MA = A,
-            typename std::enable_if<MA::min_match != MA::max_match &&
-                                    static_min<B::min_match...>::value !=
-                                    static_max<B::max_match...>::value, int>::type = 0>
-  REGEXP_INLINE static int match(Source<N> source, const size_t pos) {
+  template <std::size_t N>
+  REGEXP_INLINE static int match(Source<N> source, const size_t pos, size<A_NOT_EQUAL_B_NOT_EQUAL>) {
     int match = A::match(source, pos);
     if (match >= 0) {
       return match;
@@ -76,11 +82,8 @@ struct OR {
     return OR<B...>::match(source, pos);
   }
 
-  template <std::size_t N, typename MA = A,
-            typename std::enable_if<MA::min_match == MA::max_match &&
-                                    static_min<B::min_match...>::value ==
-                                    static_max<B::max_match...>::value, int>::type = 0>
-  REGEXP_INLINE static int match(Source<N> source, const size_t pos) {
+  template <std::size_t N>
+  REGEXP_INLINE static int match(Source<N> source, const size_t pos, size<A_EQUAL_B_EQUAL>) {
     if (A::match(source, pos) >= 0) {
       return A::lookahead;
     }
@@ -90,11 +93,8 @@ struct OR {
     return -1;
   }
 
-  template <std::size_t N, typename MA = A,
-            typename std::enable_if<MA::min_match != MA::max_match &&
-                                    static_min<B::min_match...>::value ==
-                                    static_max<B::max_match...>::value, int>::type = 0>
-  REGEXP_INLINE static int match(Source<N> source, const size_t pos) {
+  template <std::size_t N>
+  REGEXP_INLINE static int match(Source<N> source, const size_t pos, size<A_NOT_EQUAL_B_EQUAL>) {
     int match = A::match(source, pos);
     if (match >= 0) {
       return match;
@@ -105,16 +105,22 @@ struct OR {
     return -1;
   }
 
-  template <std::size_t N, typename MA = A,
-            typename std::enable_if<MA::min_match == MA::max_match &&
-                                    static_min<B::min_match...>::value !=
-                                    static_max<B::max_match...>::value, int>::type = 0>
-  REGEXP_INLINE static int match(Source<N> source, const size_t pos) {
+  template <std::size_t N>
+  REGEXP_INLINE static int match(Source<N> source, const size_t pos, size<A_EQUAL_B_NOT_EQUAL>) {
     if (A::match(source, pos) >= 0) {
       return A::lookahead;
     }
     return OR<B...>::match(source, pos);
   }
+
+  template <std::size_t N>
+  REGEXP_INLINE static int match(Source<N> source, const size_t pos) {
+    return match<N>(source, pos, size<index>{});
+  }
+
+  static const size_t min_value = static_min<B::min_match...>::value;
+  static const size_t max_value = static_max<B::max_match...>::value;
+  static const size_t index = (size_t)(A::min_match == A::max_match) * 2 + size_t(min_value == max_value);
 
   static const std::size_t lookahead = static_max<A::lookahead, B::lookahead...>::value;
   static const std::size_t min_match = static_min<A::min_match, B::min_match...>::value;
@@ -135,11 +141,8 @@ struct OR<A> {
 template <typename A, typename... B>
 struct SEQ {
 
-  template <std::size_t N, typename MA = A,
-            typename std::enable_if<MA::min_match != MA::max_match &&
-                                    static_sum<B::min_match...>::value !=
-                                    static_sum<B::max_match...>::value, int>::type = 0>
-  REGEXP_INLINE static int match(Source<N> source, const size_t pos) {
+  template <std::size_t N>
+  REGEXP_INLINE static int match(Source<N> source, const size_t pos, size<A_NOT_EQUAL_B_NOT_EQUAL>) {
     int a = A::match(source, pos);
     if (a < 0) { return -1; }
     int b = SEQ<B...>::match(source, pos + a);
@@ -147,11 +150,8 @@ struct SEQ {
     return a + b;
   }
 
-  template <std::size_t N, typename MA = A,
-            typename std::enable_if<MA::min_match == MA::max_match &&
-                                    static_sum<B::min_match...>::value ==
-                                    static_sum<B::max_match...>::value, int>::type = 0>
-  REGEXP_INLINE static int match(Source<N> source, const size_t pos) {
+  template <std::size_t N>
+  REGEXP_INLINE static int match(Source<N> source, const size_t pos, size<A_EQUAL_B_EQUAL>) {
     if (A::match(source, pos) < 0) {
       return -1;
     }
@@ -161,11 +161,8 @@ struct SEQ {
     return lookahead;
   }
 
-  template <std::size_t N, typename MA = A,
-            typename std::enable_if<MA::min_match != MA::max_match &&
-                                    static_sum<B::min_match...>::value ==
-                                    static_sum<B::max_match...>::value, int>::type = 0>
-  REGEXP_INLINE static int match(Source<N> source, const size_t pos) {
+  template <std::size_t N>
+  REGEXP_INLINE static int match(Source<N> source, const size_t pos, size<A_NOT_EQUAL_B_EQUAL>) {
     int a = A::match(source, pos);
     if (a < 0) { return -1; }
     if (SEQ<B...>::match(source, pos + a) < 0) {
@@ -174,11 +171,8 @@ struct SEQ {
     return a + static_sum<B::lookahead...>::value;
   }
 
-  template <std::size_t N, typename MA = A,
-            typename std::enable_if<MA::min_match == MA::max_match &&
-                                    static_sum<B::min_match...>::value !=
-                                    static_sum<B::max_match...>::value, int>::type = 0>
-  REGEXP_INLINE static int match(Source<N> source, const size_t pos) {
+  template <std::size_t N>
+  REGEXP_INLINE static int match(Source<N> source, const size_t pos, size<A_EQUAL_B_NOT_EQUAL>) {
     if (A::match(source, pos) < 0) {
       return -1;
     }
@@ -186,6 +180,16 @@ struct SEQ {
     if (b < 0) { return -1; }
     return A::lookahead + b;
   }
+
+  template <std::size_t N>
+  REGEXP_INLINE static int match(Source<N> source, const size_t pos) {
+    return match<N>(source, pos, size<index>{});
+  }
+
+  static const size_t min_value = static_sum<B::min_match...>::value;
+  static const size_t max_value = static_sum<B::max_match...>::value;
+  static const size_t index = (size_t)(A::min_match == A::max_match) * 2 + size_t(min_value == max_value);
+
   static const std::size_t lookahead = static_sum<A::lookahead, B::lookahead...>::value;
   static const std::size_t min_match = static_sum<A::min_match, B::min_match...>::value;
   static const std::size_t max_match = static_sum<A::max_match, B::max_match...>::value;

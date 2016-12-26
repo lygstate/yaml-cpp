@@ -37,13 +37,20 @@ struct plalloc {
 
   typedef T value_type;
 
-  plalloc() = default;
+  plalloc(): memory(new std::vector<std::unique_ptr<char>>()),
+    available(new std::vector<void *>()) {
+  };
   template<typename U>
-  plalloc(const plalloc<U, N> &) {}
-  plalloc(const plalloc &) {}
-  plalloc & operator=(const plalloc &) { return *this; }
+  plalloc(const plalloc<U, N> &) : memory(new std::vector<std::unique_ptr<char>>()),
+    available(new std::vector<void *>()) {
+  }
+  plalloc(const plalloc &) : memory(new std::vector<std::unique_ptr<char>>()),
+    available(new std::vector<void *>()) {
+  }
+  plalloc & operator=(const plalloc &) = delete;
   plalloc(plalloc &&) = default;
   plalloc & operator=(plalloc &&) = default;
+  ~plalloc() = default;
 
   typedef std::true_type propagate_on_container_copy_assignment;
   typedef std::true_type propagate_on_container_move_assignment;
@@ -59,31 +66,28 @@ struct plalloc {
   T * allocate(size_t num_to_allocate) {
     if (num_to_allocate != 1) {
       return static_cast<T *>(::operator new(sizeof(T) * num_to_allocate));
-
-    } else if (available.empty()) {
+    } else if (available->empty()) {
       // first allocate N, then double whenever
       // we run out of memory
-      size_t to_allocate = N << memory.size();
+      size_t to_allocate = N << memory->size();
       //printf("alloc %lu\n", to_allocate);
-      available.reserve(to_allocate);
-      std::unique_ptr<value_holder[]> allocated(new value_holder[to_allocate]);
-      value_holder * first_new = allocated.get();
-      memory.emplace_back(std::move(allocated));
-      size_t to_return = to_allocate - 1;
-      for (size_t i = 0; i < to_return; ++i) {
-        available.push_back(std::addressof(first_new[i].value));
+      available->reserve(to_allocate);
+      std::unique_ptr<char> allocated((char*)::operator new(sizeof(T) * to_allocate));
+      T* first_new = (T *)allocated.get();
+      memory->emplace_back(std::move(allocated));
+      for (size_t i = 1; i < to_allocate; ++i) {
+        available->push_back(first_new + i);
       }
-      return std::addressof(first_new[to_return].value);
-
+      return first_new;
     } else {
-      T * result = available.back();
-      available.pop_back();
+      T * result = (T*)available->back();
+      available->pop_back();
       return result;
     }
   }
   void deallocate(T * ptr, size_t num_to_free) {
     if (num_to_free == 1) {
-      available.push_back(ptr);
+      available->push_back(ptr);
     } else {
       ::operator delete(ptr);
     }
@@ -110,13 +114,7 @@ struct plalloc {
     object->~U();
   }
 
-private:
-  union value_holder {
-    value_holder() {}
-    ~value_holder() {}
-    T value;
-  };
-
-  std::vector<std::unique_ptr<value_holder[]>> memory;
-  std::vector<T *> available;
+public:
+  std::vector<std::unique_ptr<char>> *memory;
+  std::vector<void *> *available;
 };
