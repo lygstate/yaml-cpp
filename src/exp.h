@@ -187,6 +187,16 @@ struct SEQ {
     if (b < 0) { return -1; }
     return A::lookahead + b;
   }
+
+  template <std::size_t N>
+  REGEXP_INLINE static int match(Source<N> source, const size_t pos) {
+    int a = A::match(source, pos);
+    if (a < 0) { return -1; }
+    int b = SEQ<B...>::match(source, pos + a);
+    if (b < 0) { return -1; }
+    return a + b;
+  }
+
   static const std::size_t lookahead = static_sum<A::lookahead, B::lookahead...>::value;
   static const std::size_t min_match = static_sum<A::min_match, B::min_match...>::value;
   static const std::size_t max_match = static_sum<A::max_match, B::max_match...>::value;
